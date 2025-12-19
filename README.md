@@ -45,6 +45,7 @@ go build -o aic
 
 ```bash
 aic <source> [flags]
+aic latest [flags]
 ```
 
 ### Examples
@@ -55,6 +56,37 @@ aic codex -json               # Latest Codex changelog as JSON
 aic opencode -list            # List all OpenCode versions
 aic gemini -version 0.1.0     # Specific Gemini CLI version
 aic copilot -md               # Latest Copilot changelog as markdown
+aic latest                    # All releases from last 24 hours
+aic latest -json              # Recent releases as JSON
+```
+
+## Commands
+
+### `aic latest`
+
+Show releases from all sources in the last 24 hours, sorted by release date (newest first).
+
+```
+$ aic latest
+OpenAI Codex 0.76.0 (2025-12-19)
+----------------------------------------
+
+[New Features]
+  * Add a macOS DMG build target
+  * Add /ps command
+  ...
+
+OpenCode 1.0.170 (2025-12-19)
+----------------------------------------
+
+[TUI]
+  * User messages as markdown with toggle
+  ...
+
+Claude Code 2.0.73 (2025-12-19)
+----------------------------------------
+  * Added clickable `[Image #N]` links
+  ...
 ```
 
 ## Flags
@@ -72,24 +104,44 @@ aic copilot -md               # Latest Copilot changelog as markdown
 
 ### Plain text (default)
 
+Output includes release date and section headers (when available):
+
 ```
-$ aic claude
-Claude Code 2.0.73
+$ aic opencode
+OpenCode 1.0.170 (2025-12-19)
 ----------------------------------------
-  * Added clickable `[Image #N]` links that open attached images
-  * Fixed slow input history cycling
-  * Improved theme picker UI
+
+[TUI]
+  * User messages as markdown with toggle
+  * Implement smooth scrolling for autocomplete dropdown
+
+[Desktop]
+  * Fixed error handling
+  * Separate prompt history for shell
 ```
 
 ### JSON output
 
 ```
-$ aic codex -json
+$ aic opencode -json
 {
-  "version": "0.0.1",
-  "changes": [
-    "Initial release",
-    "Added support for..."
+  "version": "1.0.170",
+  "released_at": "2025-12-19T15:30:00Z",
+  "sections": [
+    {
+      "name": "TUI",
+      "changes": [
+        "User messages as markdown with toggle",
+        "Implement smooth scrolling..."
+      ]
+    },
+    {
+      "name": "Desktop",
+      "changes": [
+        "Fixed error handling",
+        "Separate prompt history for shell"
+      ]
+    }
   ]
 }
 ```
@@ -98,9 +150,9 @@ $ aic codex -json
 
 ```
 $ aic opencode -list
-0.2.0
-0.1.9
-0.1.8
+1.0.170
+1.0.169
+1.0.168
 ...
 ```
 
