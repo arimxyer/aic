@@ -12,9 +12,15 @@ import (
 
 var version = "dev"
 
-type ChangelogEntry struct {
-	Version string   `json:"version"`
+type Section struct {
+	Name    string   `json:"name"`
 	Changes []string `json:"changes"`
+}
+
+type ChangelogEntry struct {
+	Version  string    `json:"version"`
+	Sections []Section `json:"sections,omitempty"`
+	Changes  []string  `json:"changes,omitempty"`
 }
 
 type Source struct {
@@ -233,31 +239,65 @@ func fetchGitHubReleases(owner, repo string) ([]ChangelogEntry, error) {
 		ver = strings.TrimPrefix(ver, "v")
 		ver = strings.TrimPrefix(ver, "rust-v")
 
-		changes := parseReleaseBody(rel.Body)
+		sections, ungroupedChanges := parseReleaseBody(rel.Body)
 
 		entries = append(entries, ChangelogEntry{
-			Version: ver,
-			Changes: changes,
+			Version:  ver,
+			Sections: sections,
+			Changes:  ungroupedChanges,
 		})
 	}
 
 	return entries, nil
 }
 
-func parseReleaseBody(body string) []string {
-	var changes []string
+func parseReleaseBody(body string) ([]Section, []string) {
+	var sections []Section
+	var ungroupedChanges []string
+
+	headerRegex := regexp.MustCompile(`^#{1,3}\s+(.+)$`)
 	lines := strings.Split(body, "\n")
+
+	var currentSection *Section
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
+
+		// Check for section header (# ## or ###)
+		if match := headerRegex.FindStringSubmatch(trimmed); match != nil {
+			headerName := strings.TrimSpace(match[1])
+			// Skip "What's Changed" as it's just a wrapper, not a real category
+			if headerName == "What's Changed" {
+				continue
+			}
+			// Save previous section if exists
+			if currentSection != nil && len(currentSection.Changes) > 0 {
+				sections = append(sections, *currentSection)
+			}
+			currentSection = &Section{Name: headerName}
+			continue
+		}
+
+		// Check for list item
 		if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") {
 			change := strings.TrimPrefix(trimmed, "- ")
 			change = strings.TrimPrefix(change, "* ")
 			if change != "" && !strings.HasPrefix(change, "@") {
-				changes = append(changes, change)
+				if currentSection != nil {
+					currentSection.Changes = append(currentSection.Changes, change)
+				} else {
+					ungroupedChanges = append(ungroupedChanges, change)
+				}
 			}
 		}
 	}
-	return changes
+
+	// Don't forget the last section
+	if currentSection != nil && len(currentSection.Changes) > 0 {
+		sections = append(sections, *currentSection)
+	}
+
+	return sections, ungroupedChanges
 }
 
 func parseMarkdownChangelog(content, versionPattern string) []ChangelogEntry {
@@ -332,6 +372,17 @@ func outputJSON(entry *ChangelogEntry) {
 
 func outputMarkdown(entry *ChangelogEntry) {
 	fmt.Printf("## %s\n\n", entry.Version)
+
+	// Output sectioned changes
+	for _, section := range entry.Sections {
+		fmt.Printf("### %s\n\n", section.Name)
+		for _, change := range section.Changes {
+			fmt.Printf("- %s\n", change)
+		}
+		fmt.Println()
+	}
+
+	// Output ungrouped changes
 	for _, change := range entry.Changes {
 		fmt.Printf("- %s\n", change)
 	}
@@ -340,6 +391,19 @@ func outputMarkdown(entry *ChangelogEntry) {
 func outputPlainText(displayName string, entry *ChangelogEntry) {
 	fmt.Printf("%s %s\n", displayName, entry.Version)
 	fmt.Println(strings.Repeat("-", 40))
+
+	// Output sectioned changes
+	for _, section := range entry.Sections {
+		fmt.Printf("\n[%s]\n", section.Name)
+		for _, change := range section.Changes {
+			fmt.Printf("  * %s\n", change)
+		}
+	}
+
+	// Output ungrouped changes
+	if len(entry.Sections) > 0 && len(entry.Changes) > 0 {
+		fmt.Println()
+	}
 	for _, change := range entry.Changes {
 		fmt.Printf("  * %s\n", change)
 	}
