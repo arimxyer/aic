@@ -45,6 +45,7 @@ brews:
       owner: arimxyer
       name: homebrew-tap
       token: "{{ .Env.GH_PAT }}"
+    directory: Formula
     homepage: https://github.com/arimxyer/cc-latest
     description: "Fetch the latest Claude Code changelog entry"
     license: MIT
@@ -54,6 +55,7 @@ scoops:
       owner: arimxyer
       name: scoop-bucket
       token: "{{ .Env.GH_PAT }}"
+    directory: bucket
     homepage: https://github.com/arimxyer/cc-latest
     description: "Fetch the latest Claude Code changelog entry"
     license: MIT
