@@ -2,6 +2,8 @@
 
 Fetch the latest changelogs for popular AI coding assistants.
 
+https://github.com/user-attachments/assets/061edd6a-f723-49d4-a0c2-b9a8e8ba9a16
+
 ## Supported Tools
 
 | Source | Command | Tool |
