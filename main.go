@@ -270,10 +270,10 @@ func fetchClaudeChangelog() ([]ChangelogEntry, error) {
 		return nil, err
 	}
 
-	entries := parseMarkdownChangelog(content, `(?m)^## (\d+\.\d+\.\d+)\s*$`)
+	// Regex: ## 1.2.3 or ## 1.2.3 (2024-01-07)
+	entries := parseMarkdownChangelogWithOptionalDate(content, `(?m)^## (\d+\.\d+\.\d+)(?:\s+\((\d{4}-\d{2}-\d{2})\))?\s*$`)
 
-	// Fetch last commit date for the changelog file
-	if len(entries) > 0 {
+	if len(entries) > 0 && entries[0].ReleasedAt.IsZero() {
 		commitDate := fetchGitHubFileLastCommitDate("anthropics", "claude-code", "CHANGELOG.md")
 		if !commitDate.IsZero() {
 			entries[0].ReleasedAt = commitDate
@@ -482,6 +482,40 @@ func parseMarkdownChangelogWithDate(content, versionPattern string) []ChangelogE
 		dateStr := match[2]
 
 		releasedAt, _ := time.Parse("2006-01-02", dateStr)
+
+		var contentEnd int
+		if i+1 < len(matchIndexes) {
+			contentEnd = matchIndexes[i+1][0]
+		} else {
+			contentEnd = len(content)
+		}
+
+		sectionContent := content[matchIndexes[i][1]:contentEnd]
+		changes := parseChanges(sectionContent)
+
+		entries = append(entries, ChangelogEntry{
+			Version:    ver,
+			ReleasedAt: releasedAt,
+			Changes:    changes,
+		})
+	}
+
+	return entries
+}
+
+func parseMarkdownChangelogWithOptionalDate(content, versionPattern string) []ChangelogEntry {
+	var entries []ChangelogEntry
+
+	versionRegex := regexp.MustCompile(versionPattern)
+	matches := versionRegex.FindAllStringSubmatch(content, -1)
+	matchIndexes := versionRegex.FindAllStringSubmatchIndex(content, -1)
+
+	for i, match := range matches {
+		ver := match[1]
+		var releasedAt time.Time
+		if len(match) > 2 && match[2] != "" {
+			releasedAt, _ = time.Parse("2006-01-02", match[2])
+		}
 
 		var contentEnd int
 		if i+1 < len(matchIndexes) {
