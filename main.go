@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -33,6 +34,32 @@ type Source struct {
 	DisplayName string
 	Owner       string
 	Repo        string
+	BinaryNames []string
+	VersionArgs []string
+}
+
+type InstalledInfo struct {
+	Installed bool   `json:"installed"`
+	Version   string `json:"version,omitempty"`
+	Binary    string `json:"binary,omitempty"`
+}
+
+var semverRegex = regexp.MustCompile(`(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?)`)
+
+func (s Source) DetectInstalled(ctx context.Context) InstalledInfo {
+	for _, bin := range s.BinaryNames {
+		path, err := exec.LookPath(bin)
+		if err != nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, path, s.VersionArgs...)
+		out, _ := cmd.CombinedOutput()
+		ver := semverRegex.FindString(string(out))
+		return InstalledInfo{Installed: true, Version: ver, Binary: bin}
+	}
+	return InstalledInfo{}
 }
 
 func (s Source) URL() string {
@@ -44,11 +71,11 @@ func (s Source) Fetch() ([]ChangelogEntry, error) {
 }
 
 var sources = map[string]Source{
-	"claude":   {DisplayName: "Claude Code", Owner: "anthropics", Repo: "claude-code"},
-	"codex":    {DisplayName: "OpenAI Codex", Owner: "openai", Repo: "codex"},
-	"opencode": {DisplayName: "OpenCode", Owner: "sst", Repo: "opencode"},
-	"gemini":   {DisplayName: "Gemini CLI", Owner: "google-gemini", Repo: "gemini-cli"},
-	"copilot":  {DisplayName: "GitHub Copilot CLI", Owner: "github", Repo: "copilot-cli"},
+	"claude":   {DisplayName: "Claude Code", Owner: "anthropics", Repo: "claude-code", BinaryNames: []string{"claude"}, VersionArgs: []string{"--version"}},
+	"codex":    {DisplayName: "OpenAI Codex", Owner: "openai", Repo: "codex", BinaryNames: []string{"codex"}, VersionArgs: []string{"--version"}},
+	"opencode": {DisplayName: "OpenCode", Owner: "sst", Repo: "opencode", BinaryNames: []string{"opencode"}, VersionArgs: []string{"--version"}},
+	"gemini":   {DisplayName: "Gemini CLI", Owner: "google-gemini", Repo: "gemini-cli", BinaryNames: []string{"gemini"}, VersionArgs: []string{"--version"}},
+	"copilot":  {DisplayName: "GitHub Copilot CLI", Owner: "github", Repo: "copilot-cli", BinaryNames: []string{"github-copilot-cli", "copilot"}, VersionArgs: []string{"--version"}},
 }
 
 func main() {
@@ -303,11 +330,15 @@ func runStatusCommand(jsonOutput bool) {
 	}
 
 	results := make(chan statusResult, len(sources))
+	installedResults := make(map[string]InstalledInfo)
+	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	// Fetch up to 10 entries from each source concurrently
+	ctx := context.Background()
+
+	// Fetch releases and detect installed tools concurrently
 	for name, src := range sources {
-		wg.Add(1)
+		wg.Add(2)
 		go func(name string, src Source) {
 			defer wg.Done()
 			entries, err := src.Fetch()
@@ -318,6 +349,13 @@ func runStatusCommand(jsonOutput bool) {
 				err:         err,
 			}
 		}(name, src)
+		go func(name string, src Source) {
+			defer wg.Done()
+			info := src.DetectInstalled(ctx)
+			mu.Lock()
+			installedResults[name] = info
+			mu.Unlock()
+		}(name, src)
 	}
 
 	go func() {
@@ -326,13 +364,14 @@ func runStatusCommand(jsonOutput bool) {
 	}()
 
 	type statusEntry struct {
-		Name            string  `json:"name"`
-		Version         string  `json:"version"`
-		PreviousVersion string  `json:"previous_version"`
-		UpdatedAgo      string  `json:"updated_ago"`
-		UpdatedRecently bool    `json:"updated_recently"`
-		AvgReleaseFreq  string  `json:"avg_release_freq"`
-		releasedAt      time.Time
+		Name             string `json:"name"`
+		InstalledVersion string `json:"installed_version"`
+		Version          string `json:"version"`
+		UpdatedAgo       string `json:"updated_ago"`
+		UpdatedRecently  bool   `json:"updated_recently"`
+		AvgReleaseFreq   string `json:"avg_release_freq"`
+		sourceName       string
+		releasedAt       time.Time
 	}
 
 	var statusEntries []statusEntry
@@ -349,17 +388,14 @@ func runStatusCommand(jsonOutput bool) {
 		}
 
 		entry := statusEntry{
-			Name:            r.displayName,
-			Version:         r.entries[0].Version,
-			PreviousVersion: "-",
-			UpdatedAgo:      "-",
-			UpdatedRecently: false,
-			AvgReleaseFreq:  "-",
-			releasedAt:      r.entries[0].ReleasedAt,
-		}
-
-		if len(r.entries) > 1 {
-			entry.PreviousVersion = r.entries[1].Version
+			Name:             r.displayName,
+			InstalledVersion: "-",
+			Version:          r.entries[0].Version,
+			UpdatedAgo:       "-",
+			UpdatedRecently:  false,
+			AvgReleaseFreq:   "-",
+			sourceName:       r.source,
+			releasedAt:       r.entries[0].ReleasedAt,
 		}
 
 		if !r.entries[0].ReleasedAt.IsZero() {
@@ -371,6 +407,20 @@ func runStatusCommand(jsonOutput bool) {
 		entry.AvgReleaseFreq = calculateAvgReleaseFreq(r.entries)
 
 		statusEntries = append(statusEntries, entry)
+	}
+
+	// Populate installed versions
+	for i := range statusEntries {
+		mu.Lock()
+		info, ok := installedResults[statusEntries[i].sourceName]
+		mu.Unlock()
+		if ok && info.Installed {
+			if info.Version != "" {
+				statusEntries[i].InstalledVersion = info.Version
+			} else {
+				statusEntries[i].InstalledVersion = "yes"
+			}
+		}
 	}
 
 	// Sort by most recently updated
@@ -397,40 +447,39 @@ func runStatusCommand(jsonOutput bool) {
 	// Print table with borders
 	// Column widths
 	const (
-		colTool     = 20
-		col24h      = 3
-		colVersion  = 12
-		colPrevious = 12
-		colUpdated  = 10
-		colFreq     = 19
+		colTool      = 20
+		col24h       = 3
+		colInstalled = 12
+		colVersion   = 12
+		colUpdated   = 10
+		colFreq      = 19
 	)
 
+	border := func(left, mid, right string) string {
+		return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+			left, strings.Repeat("─", colTool+2),
+			mid, strings.Repeat("─", col24h+2),
+			mid, strings.Repeat("─", colInstalled+2),
+			mid, strings.Repeat("─", colVersion+2),
+			mid, strings.Repeat("─", colUpdated+2),
+			mid, strings.Repeat("─", colFreq+2),
+			right)
+	}
+
 	// Top border
-	fmt.Printf("┌%s┬%s┬%s┬%s┬%s┬%s┐\n",
-		strings.Repeat("─", colTool+2),
-		strings.Repeat("─", col24h+2),
-		strings.Repeat("─", colVersion+2),
-		strings.Repeat("─", colPrevious+2),
-		strings.Repeat("─", colUpdated+2),
-		strings.Repeat("─", colFreq+2))
+	fmt.Print(border("┌", "┬", "┐"))
 
 	// Header row
 	fmt.Printf("│ %-*s │ %-*s │ %-*s │ %-*s │ %-*s │ %-*s │\n",
 		colTool, "Tool",
 		col24h, "24h",
-		colVersion, "Version",
-		colPrevious, "Previous",
+		colInstalled, "Installed",
+		colVersion, "Latest",
 		colUpdated, "Updated",
 		colFreq, "Vers. Release Freq.")
 
 	// Header separator
-	fmt.Printf("├%s┼%s┼%s┼%s┼%s┼%s┤\n",
-		strings.Repeat("─", colTool+2),
-		strings.Repeat("─", col24h+2),
-		strings.Repeat("─", colVersion+2),
-		strings.Repeat("─", colPrevious+2),
-		strings.Repeat("─", colUpdated+2),
-		strings.Repeat("─", colFreq+2))
+	fmt.Print(border("├", "┼", "┤"))
 
 	// Data rows
 	for _, e := range statusEntries {
@@ -441,20 +490,14 @@ func runStatusCommand(jsonOutput bool) {
 		fmt.Printf("│ %-*s │ %s │ %-*s │ %-*s │ %-*s │ %-*s │\n",
 			colTool, truncateString(e.Name, colTool),
 			recentMarker,
+			colInstalled, truncateString(e.InstalledVersion, colInstalled),
 			colVersion, truncateString(e.Version, colVersion),
-			colPrevious, truncateString(e.PreviousVersion, colPrevious),
 			colUpdated, e.UpdatedAgo,
 			colFreq, e.AvgReleaseFreq)
 	}
 
 	// Bottom border
-	fmt.Printf("└%s┴%s┴%s┴%s┴%s┴%s┘\n",
-		strings.Repeat("─", colTool+2),
-		strings.Repeat("─", col24h+2),
-		strings.Repeat("─", colVersion+2),
-		strings.Repeat("─", colPrevious+2),
-		strings.Repeat("─", colUpdated+2),
-		strings.Repeat("─", colFreq+2))
+	fmt.Print(border("└", "┴", "┘"))
 }
 
 func truncateString(s string, maxLen int) string {
