@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/term"
 )
 
 var version = "dev"
@@ -82,6 +85,188 @@ var sources = map[string]Source{
 	"goose":    {DisplayName: "Goose", Owner: "block", Repo: "goose", BinaryNames: []string{"goose"}, VersionArgs: []string{"--version"}},
 }
 
+type Config struct {
+	DisabledSources []string `json:"disabled_sources"`
+}
+
+func configPath() string {
+	dir := os.Getenv("XDG_CONFIG_HOME")
+	if dir == "" {
+		home, _ := os.UserHomeDir()
+		dir = filepath.Join(home, ".config")
+	}
+	return filepath.Join(dir, "aic", "config.json")
+}
+
+func loadConfig() Config {
+	data, err := os.ReadFile(configPath())
+	if err != nil {
+		return Config{}
+	}
+	var cfg Config
+	json.Unmarshal(data, &cfg)
+	return cfg
+}
+
+func saveConfig(cfg Config) error {
+	p := configPath()
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(p, data, 0644)
+}
+
+func enabledSources() map[string]Source {
+	cfg := loadConfig()
+	disabled := make(map[string]bool)
+	for _, s := range cfg.DisabledSources {
+		disabled[s] = true
+	}
+	result := make(map[string]Source)
+	for name, src := range sources {
+		if !disabled[name] {
+			result[name] = src
+		}
+	}
+	return result
+}
+
+func runConfigCommand() {
+	cfg := loadConfig()
+	disabled := make(map[string]bool)
+	for _, s := range cfg.DisabledSources {
+		disabled[s] = true
+	}
+
+	// Build sorted list of source keys
+	type sourceItem struct {
+		key     string
+		display string
+		enabled bool
+	}
+	var items []sourceItem
+	for name, src := range sources {
+		items = append(items, sourceItem{key: name, display: src.DisplayName, enabled: !disabled[name]})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].display < items[j].display
+	})
+
+	cursor := 0
+
+	render := func() {
+		// Move cursor to top and clear
+		fmt.Fprintf(os.Stderr, "\033[%dA", len(items)+2)
+		fmt.Fprintf(os.Stderr, "\033[J")
+		fmt.Fprintf(os.Stderr, "Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\n\n")
+		for i, item := range items {
+			check := "x"
+			if !item.enabled {
+				check = " "
+			}
+			pointer := "  "
+			if i == cursor {
+				pointer = "> "
+			}
+			fmt.Fprintf(os.Stderr, "%s[%s] %s\n", pointer, check, item.display)
+		}
+	}
+
+	// Initial render
+	fmt.Fprintf(os.Stderr, "Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\n\n")
+	for i, item := range items {
+		check := "x"
+		if !item.enabled {
+			check = " "
+		}
+		pointer := "  "
+		if i == cursor {
+			pointer = "> "
+		}
+		fmt.Fprintf(os.Stderr, "%s[%s] %s\n", pointer, check, item.display)
+	}
+
+	// Enter raw mode
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: unable to enter raw mode: %v\n", err)
+		os.Exit(1)
+	}
+	defer term.Restore(int(os.Stdin.Fd()), oldState)
+
+	buf := make([]byte, 3)
+	for {
+		n, err := os.Stdin.Read(buf)
+		if err != nil {
+			break
+		}
+
+		if n == 1 {
+			switch buf[0] {
+			case 'q', 3: // q or Ctrl+C
+				term.Restore(int(os.Stdin.Fd()), oldState)
+				fmt.Fprintf(os.Stderr, "\nCancelled.\n")
+				return
+			case ' ':
+				items[cursor].enabled = !items[cursor].enabled
+				render()
+			case 13: // Enter
+				term.Restore(int(os.Stdin.Fd()), oldState)
+				var disabledList []string
+				for _, item := range items {
+					if !item.enabled {
+						disabledList = append(disabledList, item.key)
+					}
+				}
+				sort.Strings(disabledList)
+				newCfg := Config{DisabledSources: disabledList}
+				if err := saveConfig(newCfg); err != nil {
+					fmt.Fprintf(os.Stderr, "\nError saving config: %v\n", err)
+					os.Exit(1)
+				}
+				enabledCount := 0
+				for _, item := range items {
+					if item.enabled {
+						enabledCount++
+					}
+				}
+				fmt.Fprintf(os.Stderr, "\nSaved. %d/%d sources enabled.\n", enabledCount, len(items))
+				return
+			case 'k': // vim up
+				if cursor > 0 {
+					cursor--
+				}
+				render()
+			case 'j': // vim down
+				if cursor < len(items)-1 {
+					cursor++
+				}
+				render()
+			}
+		}
+
+		// Arrow key sequences: ESC [ A/B
+		if n == 3 && buf[0] == 27 && buf[1] == 91 {
+			switch buf[2] {
+			case 65: // Up
+				if cursor > 0 {
+					cursor--
+				}
+				render()
+			case 66: // Down
+				if cursor < len(items)-1 {
+					cursor++
+				}
+				render()
+			}
+		}
+	}
+}
+
 func main() {
 	args := os.Args[1:]
 
@@ -92,6 +277,11 @@ func main() {
 
 	if args[0] == "-v" || args[0] == "--version" {
 		fmt.Printf("aic version %s\n", version)
+		os.Exit(0)
+	}
+
+	if args[0] == "config" {
+		runConfigCommand()
 		os.Exit(0)
 	}
 
@@ -113,7 +303,7 @@ func main() {
 			}
 		}
 		if webOpen {
-			for _, src := range sources {
+			for _, src := range enabledSources() {
 				openBrowser(src.URL())
 			}
 			os.Exit(0)
@@ -133,7 +323,7 @@ func main() {
 			}
 		}
 		if webOpen {
-			for _, src := range sources {
+			for _, src := range enabledSources() {
 				openBrowser(src.URL())
 			}
 			os.Exit(0)
@@ -239,7 +429,8 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  goose       Goose (Block)\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  latest             Show releases from all sources in last 24h\n")
-	fmt.Fprintf(os.Stderr, "  status             Show status table of all sources\n\n")
+	fmt.Fprintf(os.Stderr, "  status             Show status table of all sources\n")
+	fmt.Fprintf(os.Stderr, "  config             Configure which sources to show\n\n")
 	fmt.Fprintf(os.Stderr, "Flags:\n")
 	fmt.Fprintf(os.Stderr, "  -json              Output as JSON\n")
 	fmt.Fprintf(os.Stderr, "  -md                Output as markdown\n")
@@ -269,10 +460,11 @@ func runLatestCommand(jsonOutput bool) {
 		err     error
 	}
 
-	results := make(chan result, len(sources))
+	active := enabledSources()
+	results := make(chan result, len(active))
 	var wg sync.WaitGroup
 
-	for name, src := range sources {
+	for name, src := range active {
 		wg.Add(1)
 		go func(name string, src Source) {
 			defer wg.Done()
@@ -337,7 +529,8 @@ func runStatusCommand(jsonOutput bool) {
 		err         error
 	}
 
-	results := make(chan statusResult, len(sources))
+	active := enabledSources()
+	results := make(chan statusResult, len(active))
 	installedResults := make(map[string]InstalledInfo)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -345,7 +538,7 @@ func runStatusCommand(jsonOutput bool) {
 	ctx := context.Background()
 
 	// Fetch releases and detect installed tools concurrently
-	for name, src := range sources {
+	for name, src := range active {
 		wg.Add(2)
 		go func(name string, src Source) {
 			defer wg.Done()
