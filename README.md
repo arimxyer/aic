@@ -10,10 +10,13 @@ https://github.com/user-attachments/assets/061edd6a-f723-49d4-a0c2-b9a8e8ba9a16
 |--------|---------|------|
 | `claude` | `aic claude` | [Claude Code](https://github.com/anthropics/claude-code) (Anthropic) |
 | `codex` | `aic codex` | [Codex CLI](https://github.com/openai/codex) (OpenAI) |
-| `opencode` | `aic opencode` | [OpenCode](https://github.com/sst/opencode) (SST) |
+| `opencode` | `aic opencode` | [OpenCode](https://github.com/anomalyco/opencode) |
 | `gemini` | `aic gemini` | [Gemini CLI](https://github.com/google-gemini/gemini-cli) (Google) |
 | `copilot` | `aic copilot` | [Copilot CLI](https://github.com/github/copilot-cli) (GitHub) |
 | `openclaw` | `aic openclaw` | [OpenClaw](https://github.com/openclaw/openclaw) |
+| `kimi` | `aic kimi` | [Kimi CLI](https://github.com/MoonshotAI/kimi-cli) (Moonshot AI) |
+| `qwen` | `aic qwen` | [Qwen Code](https://github.com/QwenLM/qwen-code) (Alibaba) |
+| `goose` | `aic goose` | [Goose](https://github.com/block/goose) (Block) |
 
 > **Want to add another tool?** Missing your favorite AI coding assistant? [Open an issue](https://github.com/arimxyer/aic/issues) or [submit a PR](https://github.com/arimxyer/aic/pulls)!
 

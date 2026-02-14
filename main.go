@@ -73,10 +73,13 @@ func (s Source) Fetch() ([]ChangelogEntry, error) {
 var sources = map[string]Source{
 	"claude":   {DisplayName: "Claude Code", Owner: "anthropics", Repo: "claude-code", BinaryNames: []string{"claude"}, VersionArgs: []string{"--version"}},
 	"codex":    {DisplayName: "OpenAI Codex", Owner: "openai", Repo: "codex", BinaryNames: []string{"codex"}, VersionArgs: []string{"--version"}},
-	"opencode": {DisplayName: "OpenCode", Owner: "sst", Repo: "opencode", BinaryNames: []string{"opencode"}, VersionArgs: []string{"--version"}},
+	"opencode": {DisplayName: "OpenCode", Owner: "anomalyco", Repo: "opencode", BinaryNames: []string{"opencode"}, VersionArgs: []string{"--version"}},
 	"gemini":   {DisplayName: "Gemini CLI", Owner: "google-gemini", Repo: "gemini-cli", BinaryNames: []string{"gemini"}, VersionArgs: []string{"--version"}},
 	"copilot":  {DisplayName: "GitHub Copilot CLI", Owner: "github", Repo: "copilot-cli", BinaryNames: []string{"github-copilot-cli", "copilot"}, VersionArgs: []string{"--version"}},
 	"openclaw": {DisplayName: "OpenClaw", Owner: "openclaw", Repo: "openclaw", BinaryNames: []string{"openclaw"}, VersionArgs: []string{"--version"}},
+	"kimi":     {DisplayName: "Kimi CLI", Owner: "MoonshotAI", Repo: "kimi-cli", BinaryNames: []string{"kimi"}, VersionArgs: []string{"--version"}},
+	"qwen":     {DisplayName: "Qwen Code", Owner: "QwenLM", Repo: "qwen-code", BinaryNames: []string{"qwen"}, VersionArgs: []string{"--version"}},
+	"goose":    {DisplayName: "Goose", Owner: "block", Repo: "goose", BinaryNames: []string{"goose"}, VersionArgs: []string{"--version"}},
 }
 
 func main() {
@@ -227,10 +230,13 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "Sources:\n")
 	fmt.Fprintf(os.Stderr, "  claude      Claude Code (Anthropic)\n")
 	fmt.Fprintf(os.Stderr, "  codex       Codex CLI (OpenAI)\n")
-	fmt.Fprintf(os.Stderr, "  opencode    OpenCode (SST)\n")
+	fmt.Fprintf(os.Stderr, "  opencode    OpenCode\n")
 	fmt.Fprintf(os.Stderr, "  gemini      Gemini CLI (Google)\n")
 	fmt.Fprintf(os.Stderr, "  copilot     Copilot CLI (GitHub)\n")
-	fmt.Fprintf(os.Stderr, "  openclaw    OpenClaw\n\n")
+	fmt.Fprintf(os.Stderr, "  openclaw    OpenClaw\n")
+	fmt.Fprintf(os.Stderr, "  kimi        Kimi CLI (Moonshot AI)\n")
+	fmt.Fprintf(os.Stderr, "  qwen        Qwen Code (Alibaba)\n")
+	fmt.Fprintf(os.Stderr, "  goose       Goose (Block)\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  latest             Show releases from all sources in last 24h\n")
 	fmt.Fprintf(os.Stderr, "  status             Show status table of all sources\n\n")
