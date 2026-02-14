@@ -13,6 +13,7 @@ https://github.com/user-attachments/assets/061edd6a-f723-49d4-a0c2-b9a8e8ba9a16
 | `opencode` | `aic opencode` | [OpenCode](https://github.com/sst/opencode) (SST) |
 | `gemini` | `aic gemini` | [Gemini CLI](https://github.com/google-gemini/gemini-cli) (Google) |
 | `copilot` | `aic copilot` | [Copilot CLI](https://github.com/github/copilot-cli) (GitHub) |
+| `openclaw` | `aic openclaw` | [OpenClaw](https://github.com/openclaw/openclaw) |
 
 > **Want to add another tool?** Missing your favorite AI coding assistant? [Open an issue](https://github.com/arimxyer/aic/issues) or [submit a PR](https://github.com/arimxyer/aic/pulls)!
 

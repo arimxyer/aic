@@ -76,6 +76,7 @@ var sources = map[string]Source{
 	"opencode": {DisplayName: "OpenCode", Owner: "sst", Repo: "opencode", BinaryNames: []string{"opencode"}, VersionArgs: []string{"--version"}},
 	"gemini":   {DisplayName: "Gemini CLI", Owner: "google-gemini", Repo: "gemini-cli", BinaryNames: []string{"gemini"}, VersionArgs: []string{"--version"}},
 	"copilot":  {DisplayName: "GitHub Copilot CLI", Owner: "github", Repo: "copilot-cli", BinaryNames: []string{"github-copilot-cli", "copilot"}, VersionArgs: []string{"--version"}},
+	"openclaw": {DisplayName: "OpenClaw", Owner: "openclaw", Repo: "openclaw", BinaryNames: []string{"openclaw"}, VersionArgs: []string{"--version"}},
 }
 
 func main() {
@@ -228,7 +229,8 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  codex       Codex CLI (OpenAI)\n")
 	fmt.Fprintf(os.Stderr, "  opencode    OpenCode (SST)\n")
 	fmt.Fprintf(os.Stderr, "  gemini      Gemini CLI (Google)\n")
-	fmt.Fprintf(os.Stderr, "  copilot     Copilot CLI (GitHub)\n\n")
+	fmt.Fprintf(os.Stderr, "  copilot     Copilot CLI (GitHub)\n")
+	fmt.Fprintf(os.Stderr, "  openclaw    OpenClaw\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  latest             Show releases from all sources in last 24h\n")
 	fmt.Fprintf(os.Stderr, "  status             Show status table of all sources\n\n")
