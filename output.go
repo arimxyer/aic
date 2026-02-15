@@ -7,6 +7,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
+	"github.com/mattn/go-isatty"
 )
 
 func outputJSON(entry *ChangelogEntry) {
@@ -38,6 +41,43 @@ func outputMarkdown(entry *ChangelogEntry) {
 	for _, change := range entry.Changes {
 		fmt.Printf("- %s\n", change)
 	}
+}
+
+func outputVersionList(displayName string, entries []ChangelogEntry) {
+	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+		for _, entry := range entries {
+			fmt.Println(entry.Version)
+		}
+		return
+	}
+
+	fmt.Printf("%s — %d releases\n\n", displayName, len(entries))
+
+	rows := make([][]string, len(entries))
+	for i, entry := range entries {
+		date := "-"
+		ago := "-"
+		if !entry.ReleasedAt.IsZero() {
+			date = entry.ReleasedAt.Format("2006-01-02")
+			ago = formatRelativeTime(entry.ReleasedAt)
+		}
+		rows[i] = []string{entry.Version, date, ago}
+	}
+
+	headerStyle := lipgloss.NewStyle().Bold(true)
+
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		Headers("Version", "Released", "Ago").
+		Rows(rows...).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return headerStyle
+			}
+			return lipgloss.NewStyle()
+		})
+
+	fmt.Println(t)
 }
 
 func outputRendered(displayName string, entry *ChangelogEntry) {

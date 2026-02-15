@@ -128,6 +128,7 @@ Claude Code 2.0.73 (2025-12-19)
 | `-json` | Output as JSON |
 | `-md` | Output as markdown |
 | `-list` | List all available versions |
+| `-pick` | Interactive version picker |
 | `-version <ver>` | Fetch specific version |
 | `-web` | Open changelog source in browser |
 | `-v` | Show aic version |

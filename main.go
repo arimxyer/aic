@@ -83,7 +83,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var jsonOutput, mdOutput, listVersions, webOpen bool
+	var jsonOutput, mdOutput, listVersions, pickVersion, webOpen bool
 	var targetVersion string
 
 	for i := 1; i < len(args); i++ {
@@ -94,6 +94,8 @@ func main() {
 			mdOutput = true
 		case "-list", "--list":
 			listVersions = true
+		case "-pick", "--pick":
+			pickVersion = true
 		case "-web", "--web":
 			webOpen = true
 		case "-version", "--version":
@@ -120,10 +122,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	if pickVersion {
+		runPickCommand(source.DisplayName, entries)
+		os.Exit(0)
+	}
+
 	if listVersions {
-		for _, entry := range entries {
-			fmt.Println(entry.Version)
-		}
+		outputVersionList(source.DisplayName, entries)
 		os.Exit(0)
 	}
 
@@ -175,6 +180,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  -json              Output as JSON\n")
 	fmt.Fprintf(os.Stderr, "  -md                Output as markdown\n")
 	fmt.Fprintf(os.Stderr, "  -list              List all versions\n")
+	fmt.Fprintf(os.Stderr, "  -pick              Interactive version picker\n")
 	fmt.Fprintf(os.Stderr, "  -version <ver>     Get specific version\n")
 	fmt.Fprintf(os.Stderr, "  -web               Open changelog source in browser\n")
 	fmt.Fprintf(os.Stderr, "  -v, --version      Show aic version\n")
@@ -183,6 +189,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  aic claude                    # Latest Claude Code entry\n")
 	fmt.Fprintf(os.Stderr, "  aic codex -json               # Latest Codex entry as JSON\n")
 	fmt.Fprintf(os.Stderr, "  aic opencode -list            # List OpenCode versions\n")
+	fmt.Fprintf(os.Stderr, "  aic claude -pick              # Interactive version picker\n")
 	fmt.Fprintf(os.Stderr, "  aic gemini -version 0.21.0    # Specific Gemini version\n")
 	fmt.Fprintf(os.Stderr, "  aic latest                    # All releases in last 24h\n")
 	fmt.Fprintf(os.Stderr, "  aic status                    # Status table of all tools\n")
