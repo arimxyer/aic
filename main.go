@@ -158,11 +158,21 @@ func runConfigCommand() {
 
 	cursor := 0
 
+	// Enter raw mode before any rendering
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: unable to enter raw mode: %v\n", err)
+		os.Exit(1)
+	}
+	defer term.Restore(int(os.Stdin.Fd()), oldState)
+
+	// Hide cursor
+	fmt.Fprintf(os.Stderr, "\033[?25l")
+
 	render := func() {
 		// Move cursor to top and clear
-		fmt.Fprintf(os.Stderr, "\033[%dA", len(items)+2)
-		fmt.Fprintf(os.Stderr, "\033[J")
-		fmt.Fprintf(os.Stderr, "Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\n\n")
+		fmt.Fprintf(os.Stderr, "\033[%dA\033[J", len(items)+2)
+		fmt.Fprintf(os.Stderr, "Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\r\n\r\n")
 		for i, item := range items {
 			check := "x"
 			if !item.enabled {
@@ -172,12 +182,12 @@ func runConfigCommand() {
 			if i == cursor {
 				pointer = "> "
 			}
-			fmt.Fprintf(os.Stderr, "%s[%s] %s\n", pointer, check, item.display)
+			fmt.Fprintf(os.Stderr, "%s[%s] %s\r\n", pointer, check, item.display)
 		}
 	}
 
 	// Initial render
-	fmt.Fprintf(os.Stderr, "Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\n\n")
+	fmt.Fprintf(os.Stderr, "Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\r\n\r\n")
 	for i, item := range items {
 		check := "x"
 		if !item.enabled {
@@ -187,16 +197,8 @@ func runConfigCommand() {
 		if i == cursor {
 			pointer = "> "
 		}
-		fmt.Fprintf(os.Stderr, "%s[%s] %s\n", pointer, check, item.display)
+		fmt.Fprintf(os.Stderr, "%s[%s] %s\r\n", pointer, check, item.display)
 	}
-
-	// Enter raw mode
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: unable to enter raw mode: %v\n", err)
-		os.Exit(1)
-	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
 	buf := make([]byte, 3)
 	for {
@@ -208,6 +210,7 @@ func runConfigCommand() {
 		if n == 1 {
 			switch buf[0] {
 			case 'q', 3: // q or Ctrl+C
+				fmt.Fprintf(os.Stderr, "\033[?25h")
 				term.Restore(int(os.Stdin.Fd()), oldState)
 				fmt.Fprintf(os.Stderr, "\nCancelled.\n")
 				return
@@ -215,6 +218,7 @@ func runConfigCommand() {
 				items[cursor].enabled = !items[cursor].enabled
 				render()
 			case 13: // Enter
+				fmt.Fprintf(os.Stderr, "\033[?25h")
 				term.Restore(int(os.Stdin.Fd()), oldState)
 				var disabledList []string
 				for _, item := range items {
