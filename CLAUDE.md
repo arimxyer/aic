@@ -14,27 +14,42 @@ Releases are handled by GoReleaser via GitHub Actions on version tags (`v*`). Th
 
 ## Architecture
 
-This is a single-file Go CLI (`main.go`, no external dependencies) that fetches changelogs for AI coding assistants from the GitHub Releases API.
+Go CLI split across multiple files, using the Charm ecosystem (lipgloss, bubbletea, glamour) for terminal UI. Fetches changelogs for AI coding assistants from the GitHub Releases API.
 
-### Core Data Model
+### File Structure
 
-- **`Source`** — defines a tracked tool (display name, GitHub owner/repo, binary names for local detection, version args). All sources are registered in the `sources` map.
-- **`ChangelogEntry`** — a parsed release with version, date, sectioned changes, and ungrouped changes.
-- **`Section`** — a named group of changes within a release (parsed from markdown headers in release bodies).
+| File | Purpose |
+|------|---------|
+| `main.go` | Entry point, arg parsing, `printUsage()` |
+| `sources.go` | `Source` type, `sources` map, config (load/save/XDG), `enabledSources()` |
+| `fetch.go` | `ChangelogEntry`/`Section` types, `fetchGitHubReleases()`, `parseReleaseBody()` |
+| `output.go` | Output formatters: `outputJSON()`, `outputMarkdown()`, `outputPlainText()`, `outputRendered()` (glamour) |
+| `status.go` | `runStatusCommand()` — lipgloss table with concurrent fetch + install detection |
+| `latest.go` | `runLatestCommand()` — concurrent fetch, 24h filter |
+| `config.go` | `runConfigCommand()` — bubbletea interactive source picker |
+| `helpers.go` | `formatRelativeTime()`, `calculateAvgReleaseFreq()`, `openBrowser()`, `truncateString()` |
 
-### Key Functions
+### Charm Libraries
 
-- **`fetchGitHubReleases(owner, repo)`** — single GitHub API integration point; all sources use this.
-- **`parseReleaseBody(body)`** — converts markdown release notes into structured `Section`/changes. Skips "What's Changed" headers and `@`-prefixed lines (contributor mentions).
-- **`Source.DetectInstalled(ctx)`** — checks if a tool is locally installed via `exec.LookPath` + version command with 3s timeout.
+- **Lipgloss** (`lipgloss/table`) — styled status table in `status.go`
+- **Glamour** — markdown rendering for changelogs in `output.go` (`outputRendered`). Auto-detects TTY; falls back to plain text when piped.
+- **Bubbletea** — interactive config picker in `config.go` (Model/Update/View pattern)
+
+### Key Data Flow
+
+- All sources use `fetchGitHubReleases(owner, repo)` → GitHub Releases API
+- `ChangelogEntry.RawBody` stores the raw markdown for glamour rendering (excluded from JSON via `json:"-"`)
+- `parseReleaseBody()` creates structured `Sections`/`Changes` for JSON output
+- User config at `~/.config/aic/config.json` (XDG-aware) stores disabled sources
 
 ### Commands
 
-The CLI uses manual arg parsing (no framework). Three command paths:
+Manual arg parsing (no framework). Four command paths:
 1. **`aic <source> [flags]`** — fetch changelog for a specific source
-2. **`aic latest`** — all releases from last 24h across all sources (concurrent fetching)
-3. **`aic status`** — table view with versions, recency, installed status, release frequency (concurrent fetching + detection)
+2. **`aic latest`** — all releases from last 24h across enabled sources (concurrent)
+3. **`aic status`** — table view with versions, recency, installed status, release frequency
+4. **`aic config`** — interactive picker to enable/disable sources
 
 ### Adding a New Source
 
-Add an entry to the `sources` map in `main.go`. All sources use the same `fetchGitHubReleases` path, so only the GitHub owner/repo and binary detection info are needed. Update `printUsage()` to include the new source.
+Add an entry to the `sources` map in `sources.go`. All sources use `fetchGitHubReleases`, so only GitHub owner/repo and binary detection info are needed. Update `printUsage()` in `main.go` and the README table.
