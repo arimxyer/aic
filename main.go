@@ -3,196 +3,179 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/spf13/cobra"
 )
 
 var version = "dev"
 
-func main() {
-	args := os.Args[1:]
+var rootCmd = &cobra.Command{
+	Use:     "aic",
+	Short:   "AI Coding Agent Changelog Viewer",
+	Long:    "Fetch the latest changelogs for popular AI coding assistants.",
+	Version: version,
+}
 
-	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
-		printUsage()
-		os.Exit(0)
-	}
+var latestCmd = &cobra.Command{
+	Use:     "latest",
+	Short:   "Show releases from all sources in last 24h",
+	GroupID: "commands",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		webOpen, _ := cmd.Flags().GetBool("web")
+		if webOpen {
+			for _, src := range enabledSources() {
+				openBrowser(src.URL())
+			}
+			return nil
+		}
+		jsonOutput, _ := cmd.Flags().GetBool("json")
+		runLatestCommand(jsonOutput)
+		return nil
+	},
+}
 
-	if args[0] == "-v" || args[0] == "--version" {
-		fmt.Printf("aic version %s\n", version)
-		os.Exit(0)
-	}
+var statusCmd = &cobra.Command{
+	Use:     "status",
+	Short:   "Show status table of all sources",
+	GroupID: "commands",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		webOpen, _ := cmd.Flags().GetBool("web")
+		if webOpen {
+			for _, src := range enabledSources() {
+				openBrowser(src.URL())
+			}
+			return nil
+		}
+		jsonOutput, _ := cmd.Flags().GetBool("json")
+		runStatusCommand(jsonOutput)
+		return nil
+	},
+}
 
-	if args[0] == "config" {
+var configCmd = &cobra.Command{
+	Use:     "config",
+	Short:   "Configure which sources to show",
+	GroupID: "commands",
+	Run: func(cmd *cobra.Command, args []string) {
 		runConfigCommand()
-		os.Exit(0)
-	}
+	},
+}
 
-	if args[0] == "list-sources" {
+var listSourcesCmd = &cobra.Command{
+	Use:     "list-sources",
+	Short:   "List all available sources",
+	GroupID: "commands",
+	Run: func(cmd *cobra.Command, args []string) {
 		for name, src := range sources {
 			fmt.Printf("  %s\t%s\n", name, src.DisplayName)
 		}
-		os.Exit(0)
-	}
+	},
+}
 
-	if args[0] == "latest" {
-		var jsonOutput, webOpen bool
-		for i := 1; i < len(args); i++ {
-			switch args[i] {
-			case "-json", "--json":
-				jsonOutput = true
-			case "-web", "--web":
-				webOpen = true
-			}
-		}
-		if webOpen {
-			for _, src := range enabledSources() {
+func createSourceCommand(name string, src Source) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     name,
+		Short:   fmt.Sprintf("View %s changelog", src.DisplayName),
+		GroupID: "sources",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			webOpen, _ := cmd.Flags().GetBool("web")
+			if webOpen {
 				openBrowser(src.URL())
+				return nil
 			}
-			os.Exit(0)
-		}
-		runLatestCommand(jsonOutput)
-		os.Exit(0)
-	}
 
-	if args[0] == "status" {
-		var jsonOutput, webOpen bool
-		for i := 1; i < len(args); i++ {
-			switch args[i] {
-			case "-json", "--json":
-				jsonOutput = true
-			case "-web", "--web":
-				webOpen = true
+			entries, err := src.Fetch()
+			if err != nil {
+				return fmt.Errorf("fetching changelog: %w", err)
 			}
-		}
-		if webOpen {
-			for _, src := range enabledSources() {
-				openBrowser(src.URL())
+
+			if len(entries) == 0 {
+				return fmt.Errorf("no changelog entries found")
 			}
-			os.Exit(0)
-		}
-		runStatusCommand(jsonOutput)
-		os.Exit(0)
-	}
 
-	sourceName := args[0]
-	source, ok := sources[sourceName]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "Error: Unknown source '%s'\n\n", sourceName)
-		fmt.Fprintf(os.Stderr, "Available sources:\n")
-		for name := range sources {
-			fmt.Fprintf(os.Stderr, "  %s\n", name)
-		}
-		os.Exit(1)
-	}
-
-	var jsonOutput, mdOutput, listVersions, pickVersion, webOpen bool
-	var targetVersion string
-
-	for i := 1; i < len(args); i++ {
-		switch args[i] {
-		case "-json", "--json":
-			jsonOutput = true
-		case "-md", "--md":
-			mdOutput = true
-		case "-list", "--list":
-			listVersions = true
-		case "-pick", "--pick":
-			pickVersion = true
-		case "-web", "--web":
-			webOpen = true
-		case "-version", "--version":
-			if i+1 < len(args) {
-				targetVersion = args[i+1]
-				i++
+			pickVersion, _ := cmd.Flags().GetBool("pick")
+			if pickVersion {
+				runPickCommand(src.DisplayName, entries)
+				return nil
 			}
-		}
-	}
 
-	if webOpen {
-		openBrowser(source.URL())
-		os.Exit(0)
-	}
-
-	entries, err := source.Fetch()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error fetching changelog: %v\n", err)
-		os.Exit(1)
-	}
-
-	if len(entries) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: No changelog entries found\n")
-		os.Exit(1)
-	}
-
-	if pickVersion {
-		runPickCommand(source.DisplayName, entries)
-		os.Exit(0)
-	}
-
-	if listVersions {
-		outputVersionList(source.DisplayName, entries)
-		os.Exit(0)
-	}
-
-	var entry *ChangelogEntry
-	if targetVersion != "" {
-		for i := range entries {
-			if entries[i].Version == targetVersion {
-				entry = &entries[i]
-				break
+			listVersions, _ := cmd.Flags().GetBool("list")
+			if listVersions {
+				outputVersionList(src.DisplayName, entries)
+				return nil
 			}
-		}
-		if entry == nil {
-			fmt.Fprintf(os.Stderr, "Error: Version %s not found\n", targetVersion)
-			os.Exit(1)
-		}
-	} else {
-		entry = &entries[0]
+
+			targetVersion, _ := cmd.Flags().GetString("version")
+			var entry *ChangelogEntry
+			if targetVersion != "" {
+				for i := range entries {
+					if entries[i].Version == targetVersion {
+						entry = &entries[i]
+						break
+					}
+				}
+				if entry == nil {
+					return fmt.Errorf("version %s not found", targetVersion)
+				}
+			} else {
+				entry = &entries[0]
+			}
+
+			jsonOutput, _ := cmd.Flags().GetBool("json")
+			mdOutput, _ := cmd.Flags().GetBool("md")
+
+			if jsonOutput {
+				outputJSON(entry)
+			} else if mdOutput {
+				outputMarkdown(entry)
+			} else {
+				outputRendered(src.DisplayName, entry)
+			}
+
+			return nil
+		},
 	}
 
-	if jsonOutput {
-		outputJSON(entry)
-	} else if mdOutput {
-		outputMarkdown(entry)
-	} else {
-		outputRendered(source.DisplayName, entry)
+	cmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	cmd.Flags().BoolP("md", "m", false, "Output as markdown")
+	cmd.Flags().BoolP("list", "l", false, "List all versions")
+	cmd.Flags().BoolP("pick", "p", false, "Interactive version picker")
+	cmd.Flags().String("version", "", "Get specific version")
+	cmd.Flags().BoolP("web", "w", false, "Open in browser")
+
+	cmd.MarkFlagsMutuallyExclusive("json", "md")
+	cmd.MarkFlagsMutuallyExclusive("list", "pick")
+	cmd.MarkFlagsMutuallyExclusive("list", "version")
+	cmd.MarkFlagsMutuallyExclusive("pick", "version")
+
+	return cmd
+}
+
+func init() {
+	// Register command groups
+	rootCmd.AddGroup(
+		&cobra.Group{ID: "sources", Title: "Sources:"},
+		&cobra.Group{ID: "commands", Title: "Commands:"},
+	)
+
+	// Add flags to latest and status commands
+	latestCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	latestCmd.Flags().BoolP("web", "w", false, "Open in browser")
+
+	statusCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	statusCmd.Flags().BoolP("web", "w", false, "Open in browser")
+
+	// Register fixed commands
+	rootCmd.AddCommand(latestCmd, statusCmd, configCmd, listSourcesCmd)
+
+	// Dynamically register source commands
+	for name, src := range sources {
+		rootCmd.AddCommand(createSourceCommand(name, src))
 	}
 }
 
-func printUsage() {
-	fmt.Fprintf(os.Stderr, "aic - AI Coding Agent Changelog Viewer\n\n")
-	fmt.Fprintf(os.Stderr, "Usage: aic <source> [flags]\n")
-	fmt.Fprintf(os.Stderr, "       aic latest [flags]\n")
-	fmt.Fprintf(os.Stderr, "       aic status [flags]\n\n")
-	fmt.Fprintf(os.Stderr, "Sources:\n")
-	fmt.Fprintf(os.Stderr, "  claude      Claude Code (Anthropic)\n")
-	fmt.Fprintf(os.Stderr, "  codex       Codex CLI (OpenAI)\n")
-	fmt.Fprintf(os.Stderr, "  opencode    OpenCode\n")
-	fmt.Fprintf(os.Stderr, "  gemini      Gemini CLI (Google)\n")
-	fmt.Fprintf(os.Stderr, "  copilot     Copilot CLI (GitHub)\n")
-	fmt.Fprintf(os.Stderr, "  openclaw    OpenClaw\n")
-	fmt.Fprintf(os.Stderr, "  kimi        Kimi CLI (Moonshot AI)\n")
-	fmt.Fprintf(os.Stderr, "  qwen        Qwen Code (Alibaba)\n")
-	fmt.Fprintf(os.Stderr, "  goose       Goose (Block)\n\n")
-	fmt.Fprintf(os.Stderr, "Commands:\n")
-	fmt.Fprintf(os.Stderr, "  latest             Show releases from all sources in last 24h\n")
-	fmt.Fprintf(os.Stderr, "  status             Show status table of all sources\n")
-	fmt.Fprintf(os.Stderr, "  config             Configure which sources to show\n\n")
-	fmt.Fprintf(os.Stderr, "Flags:\n")
-	fmt.Fprintf(os.Stderr, "  -json              Output as JSON\n")
-	fmt.Fprintf(os.Stderr, "  -md                Output as markdown\n")
-	fmt.Fprintf(os.Stderr, "  -list              List all versions\n")
-	fmt.Fprintf(os.Stderr, "  -pick              Interactive version picker\n")
-	fmt.Fprintf(os.Stderr, "  -version <ver>     Get specific version\n")
-	fmt.Fprintf(os.Stderr, "  -web               Open changelog source in browser\n")
-	fmt.Fprintf(os.Stderr, "  -v, --version      Show aic version\n")
-	fmt.Fprintf(os.Stderr, "  -h, --help         Show this help\n\n")
-	fmt.Fprintf(os.Stderr, "Examples:\n")
-	fmt.Fprintf(os.Stderr, "  aic claude                    # Latest Claude Code entry\n")
-	fmt.Fprintf(os.Stderr, "  aic codex -json               # Latest Codex entry as JSON\n")
-	fmt.Fprintf(os.Stderr, "  aic opencode -list            # List OpenCode versions\n")
-	fmt.Fprintf(os.Stderr, "  aic claude -pick              # Interactive version picker\n")
-	fmt.Fprintf(os.Stderr, "  aic gemini -version 0.21.0    # Specific Gemini version\n")
-	fmt.Fprintf(os.Stderr, "  aic latest                    # All releases in last 24h\n")
-	fmt.Fprintf(os.Stderr, "  aic status                    # Status table of all tools\n")
-	fmt.Fprintf(os.Stderr, "  aic claude -web               # Open Claude changelog in browser\n")
-	fmt.Fprintf(os.Stderr, "  aic status -web               # Open all changelogs in browser\n")
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }

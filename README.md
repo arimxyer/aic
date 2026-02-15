@@ -60,14 +60,15 @@ aic status [flags]
 ### Examples
 
 ```bash
-aic claude                    # Latest Claude Code changelog
-aic codex -json               # Latest Codex changelog as JSON
-aic opencode -list            # List all OpenCode versions
-aic gemini -version 0.1.0     # Specific Gemini CLI version
-aic copilot -md               # Latest Copilot changelog as markdown
-aic latest                    # All releases from last 24 hours
-aic status                    # Status table of all tools
-aic claude -web               # Open Claude changelog in browser
+aic claude                      # Latest Claude Code changelog
+aic codex --json                # Latest Codex changelog as JSON
+aic opencode --list             # List all OpenCode versions
+aic gemini --version 0.1.0      # Specific Gemini CLI version
+aic copilot --md                # Latest Copilot changelog as markdown
+aic claude --pick               # Interactive version picker
+aic latest                      # All releases from last 24 hours
+aic status                      # Status table of all tools
+aic claude --web                # Open Claude changelog in browser
 ```
 
 ## Commands
@@ -123,16 +124,30 @@ Claude Code 2.0.73 (2025-12-19)
 
 ## Flags
 
-| Flag | Description |
-|------|-------------|
-| `-json` | Output as JSON |
-| `-md` | Output as markdown |
-| `-list` | List all available versions |
-| `-pick` | Interactive version picker |
-| `-version <ver>` | Fetch specific version |
-| `-web` | Open changelog source in browser |
-| `-v` | Show aic version |
-| `-h` | Show help |
+### Source flags (`aic <source>`)
+
+| Short | Long | Description |
+|-------|------|-------------|
+| `-j` | `--json` | Output as JSON |
+| `-m` | `--md` | Output as markdown |
+| `-l` | `--list` | List all available versions |
+| `-p` | `--pick` | Interactive version picker |
+| | `--version <ver>` | Fetch specific version |
+| `-w` | `--web` | Open in browser |
+
+### Command flags (`latest`, `status`)
+
+| Short | Long | Description |
+|-------|------|-------------|
+| `-j` | `--json` | Output as JSON |
+| `-w` | `--web` | Open in browser |
+
+### Global
+
+| Short | Long | Description |
+|-------|------|-------------|
+| `-v` | `--version` | Show aic version |
+| `-h` | `--help` | Show help |
 
 ## Output Examples
 
@@ -157,7 +172,7 @@ OpenCode 1.0.170 (2025-12-19)
 ### JSON output
 
 ```
-$ aic opencode -json
+$ aic opencode --json
 {
   "version": "1.0.170",
   "released_at": "2025-12-19T15:30:00Z",
@@ -183,7 +198,7 @@ $ aic opencode -json
 ### List versions
 
 ```
-$ aic opencode -list
+$ aic opencode --list
 1.0.170
 1.0.169
 1.0.168
