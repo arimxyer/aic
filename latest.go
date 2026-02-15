@@ -75,7 +75,7 @@ func runLatestCommand(jsonOutput bool) {
 			if i > 0 {
 				fmt.Println()
 			}
-			outputPlainText(entry.Source, &entry)
+			outputRendered(entry.Source, &entry)
 		}
 	}
 }

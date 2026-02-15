@@ -148,7 +148,7 @@ func main() {
 	} else if mdOutput {
 		outputMarkdown(entry)
 	} else {
-		outputPlainText(source.DisplayName, entry)
+		outputRendered(source.DisplayName, entry)
 	}
 }
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/charmbracelet/glamour"
 )
 
 func outputJSON(entry *ChangelogEntry) {
@@ -36,6 +38,21 @@ func outputMarkdown(entry *ChangelogEntry) {
 	for _, change := range entry.Changes {
 		fmt.Printf("- %s\n", change)
 	}
+}
+
+func outputRendered(displayName string, entry *ChangelogEntry) {
+	var dateStr string
+	if !entry.ReleasedAt.IsZero() {
+		dateStr = fmt.Sprintf(" (%s)", entry.ReleasedAt.Format("2006-01-02"))
+	}
+	md := fmt.Sprintf("# %s %s%s\n\n%s", displayName, entry.Version, dateStr, entry.RawBody)
+
+	rendered, err := glamour.RenderWithEnvironmentConfig(md)
+	if err != nil {
+		outputPlainText(displayName, entry)
+		return
+	}
+	fmt.Print(rendered)
 }
 
 func outputPlainText(displayName string, entry *ChangelogEntry) {

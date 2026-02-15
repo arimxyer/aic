@@ -20,6 +20,7 @@ type ChangelogEntry struct {
 	Source     string    `json:"source,omitempty"`
 	Sections   []Section `json:"sections,omitempty"`
 	Changes    []string  `json:"changes,omitempty"`
+	RawBody    string    `json:"-"`
 }
 
 func fetchGitHubReleases(owner, repo string) ([]ChangelogEntry, error) {
@@ -68,6 +69,7 @@ func fetchGitHubReleases(owner, repo string) ([]ChangelogEntry, error) {
 			ReleasedAt: releasedAt,
 			Sections:   sections,
 			Changes:    ungroupedChanges,
+			RawBody:    rel.Body,
 		})
 	}
 
