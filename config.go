@@ -59,10 +59,9 @@ func (m configModel) View() string {
 	}
 
 	bold := lipgloss.NewStyle().Bold(true)
+	dim := lipgloss.NewStyle().Faint(true)
 
 	var b strings.Builder
-	b.WriteString("Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\n")
-	b.WriteString("\n")
 
 	for i, item := range m.items {
 		check := "x"
@@ -80,6 +79,10 @@ func (m configModel) View() string {
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
+
+	b.WriteString("\n")
+	b.WriteString(dim.Render("  \u2191/\u2193 navigate \u2022 space toggle \u2022 enter save \u2022 q cancel"))
+	b.WriteString("\n")
 
 	return b.String()
 }
