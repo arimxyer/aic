@@ -55,6 +55,7 @@ go build -o aic
 aic <source> [flags]
 aic latest [flags]
 aic status [flags]
+aic config
 ```
 
 ### Examples
@@ -79,21 +80,21 @@ Show a status table of all tools with version info, update recency, and release 
 
 ```
 $ aic status
-┌──────────────────────┬─────┬──────────────┬──────────────┬────────────┬─────────────────────┐
-│ Tool                 │ 24h │ Version      │ Previous     │ Updated    │ Vers. Release Freq. │
-├──────────────────────┼─────┼──────────────┼──────────────┼────────────┼─────────────────────┤
-│ OpenAI Codex         │ [✓] │ 0.92.0       │ 0.92.0-al... │ 6h ago     │ ~3h                 │
-│ Claude Code          │ [✓] │ 2.1.20       │ 2.1.19       │ 14h ago    │ -                   │
-│ Gemini CLI           │ [✓] │ 0.27.0-ni... │ 0.27.0-ni... │ 17h ago    │ ~15h                │
-│ GitHub Copilot CLI   │     │ 0.0.395      │ 0.0.394      │ 1d ago     │ ~18h                │
-│ OpenCode             │     │ 1.1.36       │ 1.1.35       │ 1d ago     │ ~13h                │
-└──────────────────────┴─────┴──────────────┴──────────────┴────────────┴─────────────────────┘
+┌────────────────────┬─────┬───────────┬──────────┬─────────┬───────────────┐
+│ Tool               │ 24h │ Installed │ Latest   │ Updated │ Release Freq. │
+├────────────────────┼─────┼───────────┼──────────┼─────────┼───────────────┤
+│ Claude Code        │ ✓   │ 2.1.42    │ 2.1.42   │ 1d ago  │ ~1d           │
+│ OpenAI Codex       │ ✓   │ 0.92.0    │ 0.92.0   │ 6h ago  │ ~3h           │
+│ Gemini CLI         │     │ 0.27.0    │ 0.28.0   │ 2d ago  │ ~15h          │
+│ OpenCode           │     │ -         │ 1.1.36   │ 3d ago  │ ~13h          │
+└────────────────────┴─────┴───────────┴──────────┴─────────┴───────────────┘
 ```
 
-- **24h**: Shows `[✓]` if updated in the last 24 hours
-- **Version/Previous**: Current and previous version numbers
+- **24h**: Shows `✓` if updated in the last 24 hours
+- **Installed**: Locally installed version (detected from PATH), or `-` if not found
+- **Latest**: Most recent release version
 - **Updated**: Relative time since last release
-- **Vers. Release Freq.**: Average time between releases (calculated from last 10 releases)
+- **Release Freq.**: Average time between releases (calculated from last 10 releases)
 
 ### `aic latest`
 
@@ -121,6 +122,10 @@ Claude Code 2.0.73 (2025-12-19)
   * Added clickable `[Image #N]` links
   ...
 ```
+
+### `aic config`
+
+Interactive picker to enable/disable sources. Uses arrow keys to navigate, space to toggle, enter to save.
 
 ## Flags
 
