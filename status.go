@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 )
 
 func runStatusCommand(jsonOutput bool) {
@@ -135,58 +137,39 @@ func runStatusCommand(jsonOutput bool) {
 		return
 	}
 
-	// Print table with borders
-	// Column widths
-	const (
-		colTool      = 20
-		col24h       = 3
-		colInstalled = 12
-		colVersion   = 12
-		colUpdated   = 10
-		colFreq      = 19
-	)
-
-	border := func(left, mid, right string) string {
-		return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
-			left, strings.Repeat("─", colTool+2),
-			mid, strings.Repeat("─", col24h+2),
-			mid, strings.Repeat("─", colInstalled+2),
-			mid, strings.Repeat("─", colVersion+2),
-			mid, strings.Repeat("─", colUpdated+2),
-			mid, strings.Repeat("─", colFreq+2),
-			right)
-	}
-
-	// Top border
-	fmt.Print(border("┌", "┬", "┐"))
-
-	// Header row
-	fmt.Printf("│ %-*s │ %-*s │ %-*s │ %-*s │ %-*s │ %-*s │\n",
-		colTool, "Tool",
-		col24h, "24h",
-		colInstalled, "Installed",
-		colVersion, "Latest",
-		colUpdated, "Updated",
-		colFreq, "Vers. Release Freq.")
-
-	// Header separator
-	fmt.Print(border("├", "┼", "┤"))
-
-	// Data rows
-	for _, e := range statusEntries {
-		recentMarker := "   "
+	// Build table rows
+	rows := make([][]string, len(statusEntries))
+	for i, e := range statusEntries {
+		recentMarker := ""
 		if e.UpdatedRecently {
-			recentMarker = "[✓]"
+			recentMarker = "✓"
 		}
-		fmt.Printf("│ %-*s │ %s │ %-*s │ %-*s │ %-*s │ %-*s │\n",
-			colTool, truncateString(e.Name, colTool),
+		rows[i] = []string{
+			e.Name,
 			recentMarker,
-			colInstalled, truncateString(e.InstalledVersion, colInstalled),
-			colVersion, truncateString(e.Version, colVersion),
-			colUpdated, e.UpdatedAgo,
-			colFreq, e.AvgReleaseFreq)
+			e.InstalledVersion,
+			e.Version,
+			e.UpdatedAgo,
+			e.AvgReleaseFreq,
+		}
 	}
 
-	// Bottom border
-	fmt.Print(border("└", "┴", "┘"))
+	headerStyle := lipgloss.NewStyle().Bold(true)
+
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		Headers("Tool", "24h", "Installed", "Latest", "Updated", "Release Freq.").
+		Rows(rows...).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return headerStyle
+			}
+			s := lipgloss.NewStyle()
+			if col == 1 {
+				s = s.Foreground(lipgloss.Color("2"))
+			}
+			return s
+		})
+
+	fmt.Println(t)
 }
