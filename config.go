@@ -4,9 +4,85 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
-	"golang.org/x/term"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
+
+type sourceItem struct {
+	key     string
+	display string
+	enabled bool
+}
+
+type configModel struct {
+	items    []sourceItem
+	cursor   int
+	saved    bool
+	quitting bool
+}
+
+func (m configModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(m.items)-1 {
+				m.cursor++
+			}
+		case " ":
+			m.items[m.cursor].enabled = !m.items[m.cursor].enabled
+		case "enter":
+			m.saved = true
+			m.quitting = true
+			return m, tea.Quit
+		case "q", "esc", "ctrl+c":
+			m.quitting = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m configModel) View() string {
+	if m.quitting {
+		return ""
+	}
+
+	bold := lipgloss.NewStyle().Bold(true)
+
+	var b strings.Builder
+	b.WriteString("Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\n")
+	b.WriteString("\n")
+
+	for i, item := range m.items {
+		check := "x"
+		if !item.enabled {
+			check = " "
+		}
+		pointer := "  "
+		if i == m.cursor {
+			pointer = "> "
+		}
+		line := fmt.Sprintf("%s[%s] %s", pointer, check, item.display)
+		if i == m.cursor {
+			line = bold.Render(line)
+		}
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
 
 func runConfigCommand() {
 	cfg := loadConfig()
@@ -15,12 +91,6 @@ func runConfigCommand() {
 		disabled[s] = true
 	}
 
-	// Build sorted list of source keys
-	type sourceItem struct {
-		key     string
-		display string
-		enabled bool
-	}
 	var items []sourceItem
 	for name, src := range sources {
 		items = append(items, sourceItem{key: name, display: src.DisplayName, enabled: !disabled[name]})
@@ -29,117 +99,36 @@ func runConfigCommand() {
 		return items[i].display < items[j].display
 	})
 
-	cursor := 0
-
-	// Enter raw mode before any rendering
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	model := configModel{items: items}
+	p := tea.NewProgram(model)
+	result, err := p.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: unable to enter raw mode: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-	// Hide cursor
-	fmt.Fprintf(os.Stderr, "\033[?25l")
-
-	render := func() {
-		// Move cursor to top and clear
-		fmt.Fprintf(os.Stderr, "\033[%dA\033[J", len(items)+2)
-		fmt.Fprintf(os.Stderr, "Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\r\n\r\n")
-		for i, item := range items {
-			check := "x"
+	final := result.(configModel)
+	if final.saved {
+		var disabledList []string
+		for _, item := range final.items {
 			if !item.enabled {
-				check = " "
-			}
-			pointer := "  "
-			if i == cursor {
-				pointer = "> "
-			}
-			fmt.Fprintf(os.Stderr, "%s[%s] %s\r\n", pointer, check, item.display)
-		}
-	}
-
-	// Initial render
-	fmt.Fprintf(os.Stderr, "Configure sources (\u2191/\u2193 navigate, Space toggle, Enter save, q cancel):\r\n\r\n")
-	for i, item := range items {
-		check := "x"
-		if !item.enabled {
-			check = " "
-		}
-		pointer := "  "
-		if i == cursor {
-			pointer = "> "
-		}
-		fmt.Fprintf(os.Stderr, "%s[%s] %s\r\n", pointer, check, item.display)
-	}
-
-	buf := make([]byte, 3)
-	for {
-		n, err := os.Stdin.Read(buf)
-		if err != nil {
-			break
-		}
-
-		if n == 1 {
-			switch buf[0] {
-			case 'q', 3: // q or Ctrl+C
-				fmt.Fprintf(os.Stderr, "\033[?25h")
-				term.Restore(int(os.Stdin.Fd()), oldState)
-				fmt.Fprintf(os.Stderr, "\nCancelled.\n")
-				return
-			case ' ':
-				items[cursor].enabled = !items[cursor].enabled
-				render()
-			case 13: // Enter
-				fmt.Fprintf(os.Stderr, "\033[?25h")
-				term.Restore(int(os.Stdin.Fd()), oldState)
-				var disabledList []string
-				for _, item := range items {
-					if !item.enabled {
-						disabledList = append(disabledList, item.key)
-					}
-				}
-				sort.Strings(disabledList)
-				newCfg := Config{DisabledSources: disabledList}
-				if err := saveConfig(newCfg); err != nil {
-					fmt.Fprintf(os.Stderr, "\nError saving config: %v\n", err)
-					os.Exit(1)
-				}
-				enabledCount := 0
-				for _, item := range items {
-					if item.enabled {
-						enabledCount++
-					}
-				}
-				fmt.Fprintf(os.Stderr, "\nSaved. %d/%d sources enabled.\n", enabledCount, len(items))
-				return
-			case 'k': // vim up
-				if cursor > 0 {
-					cursor--
-				}
-				render()
-			case 'j': // vim down
-				if cursor < len(items)-1 {
-					cursor++
-				}
-				render()
+				disabledList = append(disabledList, item.key)
 			}
 		}
-
-		// Arrow key sequences: ESC [ A/B
-		if n == 3 && buf[0] == 27 && buf[1] == 91 {
-			switch buf[2] {
-			case 65: // Up
-				if cursor > 0 {
-					cursor--
-				}
-				render()
-			case 66: // Down
-				if cursor < len(items)-1 {
-					cursor++
-				}
-				render()
+		sort.Strings(disabledList)
+		newCfg := Config{DisabledSources: disabledList}
+		if err := saveConfig(newCfg); err != nil {
+			fmt.Fprintf(os.Stderr, "Error saving config: %v\n", err)
+			os.Exit(1)
+		}
+		enabledCount := 0
+		for _, item := range final.items {
+			if item.enabled {
+				enabledCount++
 			}
 		}
+		fmt.Fprintf(os.Stderr, "Saved. %d/%d sources enabled.\n", enabledCount, len(final.items))
+	} else if final.quitting {
+		fmt.Fprintf(os.Stderr, "Cancelled.\n")
 	}
 }
