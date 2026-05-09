@@ -42,27 +42,27 @@ changelog:
 
 brews:
   - repository:
-      owner: arimxyer
+      owner: reyamira
       name: homebrew-tap
       token: "{{ .Env.GH_PAT }}"
     directory: Formula
-    homepage: https://github.com/arimxyer/aic
+    homepage: https://github.com/reyamira/aic
     description: "AI Coding Agent Changelog Viewer - fetch changelogs for Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI"
     license: MIT
 
 scoops:
   - repository:
-      owner: arimxyer
+      owner: reyamira
       name: scoop-bucket
       token: "{{ .Env.GH_PAT }}"
     directory: bucket
-    homepage: https://github.com/arimxyer/aic
+    homepage: https://github.com/reyamira/aic
     description: "AI Coding Agent Changelog Viewer - fetch changelogs for Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI"
     license: MIT
 
 release:
   github:
-    owner: arimxyer
+    owner: reyamira
     name: aic
   draft: false
   prerelease: auto

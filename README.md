@@ -18,20 +18,20 @@ https://github.com/user-attachments/assets/68f8b2fc-b6f5-4e6f-a743-f1f31a99dee7
 | `qwen` | `aic qwen` | [Qwen Code](https://github.com/QwenLM/qwen-code) (Alibaba) |
 | `goose` | `aic goose` | [Goose](https://github.com/block/goose) (Block) |
 
-> **Want to add another tool?** Missing your favorite AI coding assistant? [Open an issue](https://github.com/arimxyer/aic/issues) or [submit a PR](https://github.com/arimxyer/aic/pulls)!
+> **Want to add another tool?** Missing your favorite AI coding assistant? [Open an issue](https://github.com/reyamira/aic/issues) or [submit a PR](https://github.com/reyamira/aic/pulls)!
 
 ## Installation
 
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew install arimxyer/tap/aic
+brew install reyamira/tap/aic
 ```
 
 ### Scoop (Windows)
 
 ```bash
-scoop bucket add arimxyer https://github.com/arimxyer/scoop-bucket
+scoop bucket add reyamira https://github.com/reyamira/scoop-bucket
 scoop install aic
 ```
 
@@ -44,7 +44,7 @@ go install github.com/arimxyer/aic@latest
 ### From source
 
 ```bash
-git clone https://github.com/arimxyer/aic
+git clone https://github.com/reyamira/aic
 cd aic
 go build -o aic
 ```
